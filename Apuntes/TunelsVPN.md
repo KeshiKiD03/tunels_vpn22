@@ -1,11 +1,3 @@
-# Tunels VPN 2021-2022
-
-<br>
-
-## Aaron Andal ASIX M11 2021-2022
-
-<br>
-
 # Tunels VPN 24.03.22
 
 # APUNTES
@@ -282,6 +274,18 @@ https://nakkaya.com/2009/04/15/using-netcat-for-file-transfers/
 
 <br>
 <br>
+
+
+En aquest exemple es farà un túnel host to host igual que l’anterior però utilitzant com a mecanisme de xifrat del tràfic certificats digitals, és a dir, Clau pública / clau privada. 
+
+El resultat funcional és el mateix que el de l’exemple anterior, però ara no cal cap secret compartit entre els dos peers. 
+
+Així si, cal disposar del conjunt de certificats apropiats.
+Com que el model de tràfic segur TLS/SSL està dissenyat per actuar amb els rols de
+client/serer aqui triarem arbitràriament un dels hosts de client i l’altre de server (by the face!).
+Per tant un tindrà els certificats de client i l’altre els certificats de server.
+
+# Ejemplo 4: "Tunet Network to Network"
 
 
 # Prácticas
