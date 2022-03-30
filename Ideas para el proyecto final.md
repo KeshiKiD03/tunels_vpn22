@@ -91,9 +91,9 @@ https://www.youtube.com/watch?v=spMYZHepjko
 
 - Ofrece servicios de Seguridad y Encriptación.
 
-- Network Seguro VPN
+- Network Seguro VPN (OpenVPN)
 
-- DNS Criptográfico
+- DNS Criptográfico 
 
 - Certificados 
 
@@ -101,4 +101,10 @@ https://www.youtube.com/watch?v=spMYZHepjko
 
 - Malwares
 
-- Permisos
+- Permisos y vulnerabilidades
+
+https://dit.gonzalonazareno.org/gestiona/proyectos/
+
+http://salesianosatocha.es/informatica/proyectos-asir/
+
+- Wazuh
