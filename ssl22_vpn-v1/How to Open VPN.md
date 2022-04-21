@@ -38,15 +38,85 @@ __ssl22:vpn__ Fitxers de claus i certificats per crerar túnels virtuals amb Ope
 
 10. Mostrar el funcionamiento de una conexión `client to client` a través del túnel VPN.
 
-* Activar algún servicio de red en los clientes que permita la `verificación` - `daytime` - `echo` - `web` ... etc
+* Activar algún servicio de red en los clientes que permita la `verificación` - `daytime (13)` - `echo (7)` - `web (80)` ... etc
 
 # Procedimiento
 
-## OpenVPN
+## OpenVPN Host Real
 
-1. Construir una Docker de Servidor OpenVPN.
+1. Instalar los paquetes necesarios para el Servidor OpenVPN `(En REAL)`.
+
+Actualizamos repositorios
+
+> apt-get update
+
+Instalamos OpenVPN
+
+> apt-get install openvpn
+
+Instalamos Openssl
+
+> apt-get install openssl
+
+Instalamos Xinetd
+
+> apt-get install xinetd
+
+Instalamos demás paquetes
+
+> apt-get -y install apache2 procps iproute2 tree nmap vim nano
 
 ## OpenSSL
+
+1. Se usará una `Entidad de Certificación CA` = _Veritat Absoluta_ --> Emitirá los certificados para __edt.org__. 
+
+    * Certificado para servidor
+
+    * Par de certificados para cliente
+
+2. Crear **certificados**:
+
+    * Test-server.pem --> Server
+
+    * Test-Client1.pem --> Host1
+
+    * Test-Client2.pem --> Host2
+
+3. Vigilar las __extensiones__ --> Tiene que cumplir unos __requisitos__ para ser válidos para OpenVPN.
+
+
+### Procedure: OpenSSL with OpenVPN
+
+
+
+
+
+**NOTA: En Docker no podemos simularlo porque no tiene SYSTEMD** 
+
+## With Docker?¿?
+
+> docker build -t keshikid03/ssl22:vpn .
+
+Creamos network nueva
+
+> docker network create --attachable=true --driver=bridge --subnet=172.20.15.0/24 --gateway=172.20.15.1 docker-network-vpn
+
+> docker network inspect docker-network-vpn
+
+Miramos tablas de IPTABLES
+
+> sudo iptables -L
+
+Iniciamos Docker
+
+> docker run --rm --name openvpnPrueba -h openvpnPrueba --net docker-network-vpn -it keshikid03/ssl22:vpn /bin/bash
+
+¿Solución?
+
+
+
+
+
 
 
 ## @keshi ASIX M11-SAD Curs 2011-2022
