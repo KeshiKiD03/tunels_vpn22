@@ -101,7 +101,7 @@ ____________________________________________________________________________
 
 1. Conectarse a Amazon y abrir `Debian`, mi pc y otro ordenador de clase.
 
-2. Desplegar el Debian de AMAZON con el puerto UDP 1194.
+2. Desplegar el Debian de `AMAZON `con el puerto `UDP ``1194`.
 
 3. Canet nos dará nombre de Entidad de Certificación inventado.
 
@@ -127,7 +127,7 @@ ____________________________________________________________________________
 
 <br>
 
-2. Con la clave privada, firmamos el "__request__" y generamos el fichero "__serverrequest_vpn.pem__"
+2. Con la clave privada, firmamos el "__request__" y generamos el fichero "__serverreq_._vpn.pem__"
 
 `openssl req -new -key serverkey_vpn.pem -out serverreq_vpn.pem`
 
@@ -163,13 +163,15 @@ keyUsage               = digitalSignature, keyEncipherment
 
 <br>
 
+> __NOTA: Importante la KEY y la CA de la ENTIDAD hay que crearla antes__
 
-4. Como CA "Inventado" - Cogemos el `Request` generado anteriormente y lo _firmaremos_ utilizando el fichero de __extensiones de Servidor__!
+
+4. Como CA "`Inventado`" - Cogemos el `Request` generado anteriormente y lo _firmaremos_ utilizando el fichero de __extensiones de Servidor__!
 
 > __NOTA__: cakey.pem y ca_NOMBRE_cert.pem lo hemos generado anteriormente con LDAPS.
 
 ```
-openssl x509 -CAkey cakey.pem -CA ca_NOMBRE_cert.pem -req -in serverrequest_vpn.pem -days 3650 -CAcreateserial -extfile ext.server.conf -out servercert_vpn.pem
+openssl x509 -CAkey cakey.pem -CA ca_ronaldo_cert.pem -req -in serverreq_vpn.pem -days 3650 -CAcreateserial -extfile ext.server.conf -out servercert_vpn.pem
 ```
 
 Signature ok
@@ -193,6 +195,26 @@ openssl dhparam -out dh2048.pem 2048
 6. Copiamos todo el contenido al `SERVIDOR DE AWS`
 
 `sudo scp -i KeshiPortable.pem * admin@IP_PubAmazon`
+
+
+```bash
+isx36579183@i11:~/Documents/tunels_vpn22/ssl22-Pruebas$ sudo scp -i ../KeshiPortable.pem * admin@54.146.253.235:~
+[sudo] password for isx36579183: 
+The authenticity of host '54.146.253.235 (54.146.253.235)' can't be established.
+ECDSA key fingerprint is SHA256:uqgYYVu3zoKUu/c4AH7qgLqyzdVM6WrMGqxNbhlRlbc.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '54.146.253.235' (ECDSA) to the list of known hosts.
+cakey.pem                                                              100%  887     9.1KB/s   00:00    
+ca_ronaldo_cert.pem                                                    100% 1090    11.1KB/s   00:00    
+ca_ronaldo_cert.srl                                                    100%   41     0.4KB/s   00:00    
+dh2048.pem                                                             100%  424     4.4KB/s   00:00    
+ext.server.conf                                                        100%  300     3.1KB/s   00:00    
+servercert_vpn.pem                                                     100% 1623    16.5KB/s   00:00    
+serverkey_vpn.pem                                                      100% 1675    17.1KB/s   00:00    
+serverreq_vpn.pem                                                      100% 1094    11.2KB/s   00:00  
+
+```
+
 
 > NOTE: Una vez copiada: Lo movemos todo a '/etc/openvpn/server'
 
