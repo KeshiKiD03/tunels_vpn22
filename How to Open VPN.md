@@ -2,9 +2,57 @@
 
 __ssl22:vpn__ Fitxers de claus i certificats per crerar túnels virtuals amb OpenVPN. Utilitza l'entitatt de certificació VeritatAbsluta i crea certificats propis per a client i servidor.
 
+Consisteix en fer una VPN entre dos hosts (client1 i client2), estiguin on estiguin en una mateixa LAN o separats per internet. 
+
+Podeu usar dos ordinadors de l’aula, o dos de casa o un ordinador de casa i un a AWS EC2 (caldrà obrir els ports apropiats de VPN __UDP 1194__). 
+
+__Quan els dos ordinadors es comuniquen per la seva interfície pública el tràfic és insegur.__
+
+`Quan es comuniquen entre ells utilitzant les interfćies dels túnels el tràfic és segur.`
+
+
+En aquest exemple es farà un túnel host to host igual que l’anterior però utilitzant com a mecanisme de xifrat del tràfic certificats digitals, és a dir, Clau pública / clau privada. 
+
+El resultat funcional és el mateix que el de l’exemple anterior, però ara no cal cap secret compartit entre els dos peers. 
+
+Així si, cal disposar del conjunt de certificats apropiats
+
+
+Com que el model de tràfic segur TLS/SSL està dissenyat per actuar amb els rols de client/serer aqui triarem arbitràriament un dels hosts de client i l’altre de server (by the face!).
+
+Per tant un tindrà els certificats de client i l’altre els certificats de server.
+
+----
+
+# Practica Final
+
+Crear una topologia amb dos clients locals i un servidor OpenVPN a AWS EC2. 
+
+Els clients han d’establir un túnel VPN amb el servidor de AWS i s’han de poder comunicar entre ells a través del túnel.
+
+Com a clients podeu usar dos hosts de casa o de l’aula. També podeu usar dos hosts de docker però que estiguin en xarxes diferents, que NO puguin tenir connectivitat entre ells si no és a través del túnel.
+
+<div>
+    <img src="./Photos/ProbCerts.png">
+</div>
+
+<br>
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+<br>
+
+
 <div>
     <img src="./Photos/Photo.png">
 </div>
+
+En aquest exemple el mecanisme de xifrat és utilitzar com a ​ Key un ​ pre-shared-secret ​ . 
+
+És a dir, un secret compartit per els dos extrems de túnel. 
+
+En configurar el túnel s’ha acordat un __secret compartir__ que saben les dues parts (per exemple jupiter) i que és la clau d’encriptació del tràfic segur. 
+
 
 # Objetivos
 
@@ -75,11 +123,13 @@ ____________________________________________________________________________
 
 1. Generación de __PAR de CLAVES__ para el __Server de AWS__:
 
-`openssl genrsa -out serverkey.vpn.pem`
+`openssl genrsa -out serverkey_vpn.pem`
 
 <br>
 
 2. Con la clave privada, firmamos el "__request__" y generamos el fichero "__serverrequest_vpn.pem__"
+
+`openssl req -new -key serverkey_vpn.pem -out serverreq_vpn.pem`
 
 Country Name (2 letter code) [AU]:__CA__
 State or Province Name (full name) [Some-State]:__Barcelona__
@@ -114,7 +164,7 @@ keyUsage               = digitalSignature, keyEncipherment
 <br>
 
 
-4. Como CA "Inventado" - Cogemos el __Request__ generado anteriormente y lo _firmaremos_ utilizando el fichero de __extensiones de Servidor__!
+4. Como CA "Inventado" - Cogemos el `Request` generado anteriormente y lo _firmaremos_ utilizando el fichero de __extensiones de Servidor__!
 
 > __NOTA__: cakey.pem y ca_NOMBRE_cert.pem lo hemos generado anteriormente con LDAPS.
 
@@ -142,9 +192,15 @@ openssl dhparam -out dh2048.pem 2048
 
 6. Copiamos todo el contenido al `SERVIDOR DE AWS`
 
+`sudo scp -i KeshiPortable.pem * admin@IP_PubAmazon`
+
+> NOTE: Una vez copiada: Lo movemos todo a '/etc/openvpn/server'
+
 <br>
 
-7. Copiamos los archivos a la carpeta correspondiente `/etc/openvpn/server`, importante tanto las `CLAVES` + `CONF DE SERVIDOR`.
+Los archivos que tenemos que copiar a Amazon son los que tenemos en `./server`, importante tanto las `CLAVES` + `CONF DE SERVIDOR`.
+
+Copiamos los archivos a la carpeta correspondiente `/etc/openvpn/server`, 
 
 * Copiar:
 
@@ -162,19 +218,16 @@ openssl dhparam -out dh2048.pem 2048
 
     * __servercert_vpn.pem__
 
-<br>
-<br>
+7. Cambiamos la configuración del `OpenVPN@.service`: 
 
+`sudo vim /usr/lib/systemd/system/openvpn@.service`
 
-8. Cambiamos la configuración del __Servicio__.
-
-`/usr/lib/systemd/system/openvpn@.service`
-
-`/etc/systemd/system/openvpn@.service`
-
-> Cambiar la que indica la __práctica__ menos la parte de __Servidor__
+> NOTE: Agregamos lo que indica la __práctica__, menos la parte de __servidor__.
 
 <br>
+
+<br>
+
 
 9. Ahora se cambia el fichero `server.conf` los paths y copiamos a `/etc/openvpn/server` --> Se destacará la línea "_client-to-client_" necesaria para tener visibilidad a los extremos del túnel.
 
@@ -229,24 +282,45 @@ o también:
     link/none 
     inet 10.8.0.1 peer 10.8.0.2/32 scope global tun0
 
-`10.8.0.1` --> GATEWAY será la VPN IP del Servidor VPN y las demás IP podrán ser clientes.
+`10.8.0.1` --> GATEWAY será la VPN IP del Servidor VPN y las demás IP __podrán ser clientes__.
 
 
 
-## CLIENTE
+--
 
-# Config client VPN (tant 1 com 2)
+# Comandos para verificar el VPN
 
-### Generem clau privada simple per el client:
+* ip address show tun0
+
+* nmap ip
+
+* `Observamos la conectividad del túnel`
+
+Desde el client: ping 10.8.0.1
+
+Des de el servidor: ping 10.8.0.X ( Se sabrá al iniciar el Servicio y poder analizar tun0 )
+
+
+
+# CLIENTE (2 DOCKERS o MAQ REAL)
+
+## Config client VPN (tant 1 com 2)
+
+## Client1
+
+## Generem clau privada simple per el client:
 
 ```
 openssl  genrsa -out clientkey.1vpn.pem
 ```
 
 
-### Amb la clau privada, signem el 'request' i generem el fitxer 'clientreq.vpn.pem':
+## Amb la clau privada, signem el 'request' i generem el fitxer 'clientreq.vpn.pem':
 
+
+```
 openssl req -new -key clientkey.1vpn.pem -out clientreq.1vpn.pem
+```
 
 You are about to be asked to enter information that will be incorporated
 into your certificate request.
@@ -258,10 +332,10 @@ If you enter '.', the field will be left blank.
 Country Name (2 letter code) [AU]:CA
 State or Province Name (full name) [Some-State]:Barcelona
 Locality Name (eg, city) []:bcn
-Organization Name (eg, company) [Internet Widgits Pty Ltd]:edt
-Organizational Unit Name (eg, section) []:client1
-Common Name (e.g. server FQDN or YOUR name) []:client1.edt.org
-Email Address []:client1@edt.org
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:__edt__
+Organizational Unit Name (eg, section) []:__client1__
+Common Name (e.g. server FQDN or YOUR name) []:__client1.edt.org__
+Email Address []:__client1@edt.org__
 
 Please enter the following 'extra' attributes
 to be sent with your certificate request
@@ -269,26 +343,66 @@ A challenge password []:jupiter
 An optional company name []:client1
 
 
-### Com a CA, agafem el 'request' generat previament i signarem utilitzant el fitxer d'extensions de (client tant com el client1 com el 2):
-
+## Com a CA, agafem el 'request' generat previament i signarem utilitzant el fitxer d'extensions de (client tant com el client1 com el 2):
+```
 openssl x509 -CAkey ../cakey.pem -CA ../cacert.pem -req -in clientreq.1vpn.pem -days 3650 -CAcreateserial -extfile ../server/ext.client.conf -out clientcert.1vpn.pem
+```
+
+
 Signature ok
 subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = client1, CN = client1.edt.org, emailAddress = client1@edt.org
 Getting CA Private Key
 
-#### Ejemplo fichero ext.client.conf
+
+#### Ejemplo fichero __ext.client.conf__
 basicConstraints        = CA:FALSE
 subjectKeyIdentifier    = hash
 authorityKeyIdentifier  = keyid,issuer:always
 
 
-### Ens copiem el fitxer de conf de client (a la ruta on toca) i certificats i clau --> /etc/openvpn/client
+### Ens copiem el `fitxer de conf de client` (a la ruta on toca) i certificats i clau --> `/etc/openvpn/client`
 
-#A /etc/openvpn/client/client.conf
+#### A /etc/openvpn/client/`client.conf`
 
 #### s'ha de canviar la ip a mà:
 
 remote IP_AWS port (1143)
+
+
+# Docker
+
+1. Se inicializa una Docker: 
+
+`docker build -t keshikid03/ssl22:client0 .`
+
+`docker network create --subnet=172.20.0.0/16 net1`
+
+`docker run --rm --name client0.edt.org -h client0.edt.org --net net1 -p 13:13 -it keshikid03/ssl22:client0`
+
+> NOTA: /bin/bash no cal pq ja ho fa el __startup.sh__
+
+> Enrutament? 
+
+
+2. Añadir el __ip_forward__ para que se pueda usar de ROUTER. 
+
+`echo 1 > /proc/sys/net/ipv4/ip_forward`
+
+
+# Prueba
+
+## TENINT EL PORT daytime (port 13) FUNCIONANT, podem fer proves tipus...
+
+  CLIENT 1 A CLIENT 2:
+
+        telnet client2.edt.org 13
+        (hauria de tornar el dia/hora)
+
+
+> `PAG 34 - REVISAR`
+
+
+# Cliente 2
 
 
 
@@ -493,9 +607,13 @@ Client1: # systemctl  start openvpn-client@client.service
 Client2: # systemctl  start openvpn-client@client.service
 ```
 
-Test:
+# Test:
 ```
 ping 10.8.0.1
 ping 10.8.0.4
 ping 10.8.0.10
 ```
+
+# XINETD
+
+
