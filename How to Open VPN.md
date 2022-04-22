@@ -215,8 +215,12 @@ serverreq_vpn.pem                                                      100% 1094
 
 ```
 
+> `Instalar OpenVPN`: `sudo apt-get install openvpn`
+
 
 > NOTE: Una vez copiada: Lo movemos todo a '/etc/openvpn/server'
+
+`sudo cp * /etc/openvpn/server/`
 
 <br>
 
@@ -247,7 +251,7 @@ Copiamos los archivos a la carpeta correspondiente `/etc/openvpn/server`,
 > NOTE: Agregamos lo que indica la __práctica__, menos la parte de __servidor__.
 
 <br>
-
+¿?
 <br>
 
 
@@ -271,6 +275,10 @@ Per això:
  key /etc/openvpn/server/serverkey_vpn.pem  
  dh /etc/openvpn/server/dh2048.pem  
 
+ 
+tls-auth /etc/openvpn/server/ta.key 0
+
+
 > Y la lñinea de CLAVE también tenemos que poner la ruta absoluta.
 
 11. Pedir el `ta.key` (Se hace a /etc/openvpn/server)
@@ -279,6 +287,15 @@ Per això:
 ```
 sudo openvpn --genkey --secret ta.key  
 ```
+
+sudo systemctl daemon-reload
+
+sudo systemctl start openvpn@server.service
+
+sudo journalctl -u openvpn@server.service -f &
+
+sudo journalctl -u openvpn@server.service -f &
+
 
 <br>
 
