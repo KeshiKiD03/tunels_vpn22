@@ -4,13 +4,13 @@ __ssl22:vpn__ Fitxers de claus i certificats per crerar túnels virtuals amb Ope
 
 # Objetivos
 
-1. Implementar `OpenVPN Server` con `systemctl` en local.
+1. Implementar `OpenVPN Client` con `systemctl` en local.
 
-2. Implementar un `servidor OpenVPN a AWS` i `dos clients locals a AWS`.
+2. Implementar un `servidor OpenVPN + OpenSSL a AWS` i `dos clients locals en distintas redes`.
 
 3. Se utilizan `certificados propios` y no los certificados por `defecto de OpenVPN`.
 
-> NOTA: La creación se hará local y luego se hará el deployment
+> NOTA: 
 
 4. Permitir la comunicación `cliente a cliente` a través del `túnel VPN`.
 
@@ -41,6 +41,49 @@ __ssl22:vpn__ Fitxers de claus i certificats per crerar túnels virtuals amb Ope
 * Activar algún servicio de red en los clientes que permita la `verificación` - `daytime (13)` - `echo (7)` - `web (80)` ... etc
 
 # Procedimiento
+
+1. Conectarse a Amazon y abrir 2 máquinas locales, mi pc y otro ordenador de clase.
+
+2. Desplegar el Debian de AMAZON con el puerto UDP 1194.
+
+3. Canet nos dará nombre de Entidad de Certificación inventado.
+
+4. Los clientes locales estarán en redes distintas. (Se cambia manualmente el network manager).
+
+5. Generar los Certificados para el Servidor de AWS a partir de la Entidad de Certificación. 
+
+----
+
+/etc/openvpn/client/client.conf
+remote 18.130.232.31 1194
+
+sudo echo 1 > /proc/sys/net/ipv4/ip_forward --> Actua como router
+
+
+sudo ip route add 172.19.0.0/16 via 10.8.0.2
+
+
+
+6. Configurar el OpenVPN para Servidor.
+
+7. Configurar el OpenVPN para Client.
+
+
+-----
+
+wget
+
+__Finalidad__: Cliente1 se conecta a la VPN que está en AMAZON con sus certificados propios de cliente y podrá verse con el Cliente2. 
+
+Ping al TUN del Otro. Y a la viceversa.
+
+openssl comandos.
+
+
+
+
+
+
 
 ## OpenVPN Host Real
 
