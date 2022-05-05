@@ -721,7 +721,7 @@ authorityKeyIdentifier  = keyid,issuer:always
 
 	GENERAMOS EL CERTIFICADO FIRMADO POR LA CA Y USANDO LAS EXTENSIONES "ext.client.conf"
 
-openssl x509 -CAkey cakey.pem -CA ca_andal_cert.pem -req -in clientreq.1vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.1vpn.pem
+openssl x509 -CAkey cakey.pem -CA cacert.pem -req -in clientreq.1vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.1vpn.pem
 
 Signature ok
 subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = client1, CN = client1.edt.org, emailAddress = client1@edt.org
@@ -753,6 +753,10 @@ key /etc/openvpn/client/clientkey.1vpn.pem
 TA.KEY
 
 tls-auth /etc/openvpn/client/ta.key 1
+
+
+HAY QUE USAR EL MISMO TA.KEY ANTERIOR!! GENERADO POR EL SERVIDOR!
+
 
 HAY QUE GENERAR EL TA.KEY DENTRO DE /ETC/OPENVPN/CLIENT [importante hacerla!!!! y especificarla dentro del fichero]
 
