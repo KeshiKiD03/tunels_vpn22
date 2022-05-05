@@ -1066,6 +1066,32 @@ VERIFICA SI ESTÁ BIEN PUESTO /etc/systemd/system/openvpn@.service
 REPETIR EL MISMO PROCESO QUE EL PRIMERO!!!!!!!!!!
 
 
+SPEEDRUN
+   95  openssl genrsa -out clientkey.2vpn.pem
+   96  openssl req -new -key clientkey.2vpn.pem -out clienreq.2vpn.pem
+   97  nano ext.client.conf
+   98  openssl x509 -CAkey cakey.pem -CA ca_andal_cert.pem -req -in clientreq.2vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.2vpn.pem
+   99  sudo openssl x509 -CAkey cakey.pem -CA ca_andal_cert.pem -req -in clientreq.2vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.2vpn.pem
+  100  sudo bash
+  101  ls -l
+  102  mv clienreq.2vpn.pem clientreq.2vpn.pem
+  103  openssl x509 -CAkey cakey.pem -CA ca_andal_cert.pem -req -in clientreq.2vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.2vpn.pem
+  104  sudo cp ca_andal_cert.pem clientcert.2vpn.pem clientkey.2vpn.pem /etc/openvpn/client/.
+  105  cd /etc/openvpn/
+  106  sudo bash
+   86  openvpn --genkey --secret ta.key
+   87  systemctl stop openvpn@client.service
+   88  systemctl start openvpn@client.service
+   89  cd /etc/systemd/system
+   90  nano openvpn\@.service 
+   91  systemctl daemon-reload
+   92  systemctl stop openvpn@client.service
+   93  systemctl start openvpn@client.service
+   94  systemctl status openvpn@client.service
+   95  ip a
+
+
+
 ----------------------------
 
 PROVES!!! CLIENT1
