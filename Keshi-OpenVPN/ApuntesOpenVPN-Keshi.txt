@@ -203,8 +203,43 @@ apt-get install tree
 
 	GENERAR CERTIFICADO DE LA CA
 
-  149  openssl req -new -x509 -nodes -sha1 -days 365 -key cakey.pem -out ca_andal_cert.pem
+  149  openssl req -new -x509 -nodes -sha1 -days 365 -key cakey.pem -out cacert.pem
 
+
+	GENERAR LA CLAVE DEL SERVIDOR SERVERKEY.
+
+	openssl genrsa -out serverkey.vpn.pem
+
+
+	CON LA CLAVE PRIVADA, FIRMAMOS LA REQUEST Y GENERAMOS EL FICHERO 'SERVERREQ.VPN.PEM'
+
+	openssl req -new -key serverkey.vpn.pem -out serverreq.vpn.pem
+
+
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:CA
+State or Province Name (full name) [Some-State]:Barcelona
+Locality Name (eg, city) []:bcn
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:edt
+Organizational Unit Name (eg, section) []:vpn
+Common Name (e.g. server FQDN or YOUR name) []:vpn.edt.org
+Email Address []:vpn@edt.org
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:jupiter
+An optional company name []:vpn
+
+
+
+
+	COMO CA, COGEMOS ESTE REQUEST GENERADO ANTERIORMMENTE Y LO FIRMAREMOS, EL FICHEROCON EXTENSIONES DE SERVIDOR.
 
 	Crear el fichero ext.server.conf
 
@@ -223,7 +258,14 @@ keyUsage               = digitalSignature, keyEncipherment
 
 	Firmar la REQ y Generar la CERT para VPN
 
-  151  openssl x509 -CAkey cakey.pem -CA ca_andal_cert.pem -req -in serverreq.vpn.pem -days 3650 -CAcreateserial -extfile ext.server.conf -out servercert.vpn.pem
+
+
+  151  openssl x509 -CAkey cakey.pem -CA cacert.pem -req -in serverreq.vpn.pem -days 3650 -CAcreateserial -extfile ext.server.conf -out servercert.vpn.pem
+
+
+Signature ok
+subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = vpn, CN = vpn.edt.org, emailAddress = vpn@edt.org
+Getting CA Private Key
 
 
 	GENERAR CLAVE DHPARAM 
@@ -249,7 +291,7 @@ Copiar y pegar la configuración del HowTo
 
 	AÑADIMOS LO SIGUIENTE [CAMBIAMOS CA / CERT / KEY / DH Y TA]
 
-ca /etc/openvpn/server/ca_andal_cert.pem
+ca /etc/openvpn/server/cacert.pem
 cert /etc/openvpn/server/servercert.vpn.pem
 key /etc/openvpn/server/serverkey.vpn.pem
 dh /etc/openvpn/server/dh2048.pem
