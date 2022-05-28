@@ -1,0 +1,1205 @@
+# OpenVPN 05.05.2022
+
+# Aaron Andal
+
+# VirtualBOX con OPENVPN
+
+Servidor de AWS en AMAZON será el Servidor VPN
+-----------------------------------------------
+
+Deployment de 3 máquinas virtuales
+-----------------------------------
+
+1 tendrá Bridge y hará NAT al EXTERIOR de las redes NetA y NetB.
+
+NetA red INTERNA 192.168.2.0/24
+
+NetB red INTERNA 192.168.3.0/24
+
+
+
+ROUTER (Linux Lite)
+	
+	enp0s3: Bridge DHCP o STATIC
+
+	enp0s8: Internal Network - NetA 192.168.2.1/24
+
+	enp0s9: Internal Network - NetB 192.168.3.1/24
+
+Host A1:
+
+	enp0s3: 192.168.2.2/24
+
+	GATEWAY: 192.168.2.1/24
+
+Host B1:
+
+	enp0s3: 192.168.3.2/24
+
+	GATEWAY: 192.168.3.1/24
+
+DNS POR DEFECTO EN /ETC/RESOLV.CONF
+
+--------------
+PROCEDIMIENTO
+--------------
+
+1. Abrir y actualizar VirtualBox
+
+2. Añadir las máquinas virtuales de Linux Lite (Puedes usar la que quieras) y abrir las interfícies mencionadas anteriormente. Añadir los 2 clientes Debian Minimal en RED INTERNA.
+
+	Cambiar la UUID de alguna VDI si es necesario: (Si lo copias manualmente en lugar de clonar)
+
+		Abrir la terminal en modo ADMINISTRADOR 
+
+	Z:\ASIX OpenVPN\Cliente Debian Minimal - copia>"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" internalcommands sethduuid Debian_10.11.0_VBM\Debian_10.11.0_VBM_LinuxVMImages.COM.vdi                                                       
+
+UUID changed to: 3c4d1459-3459-4667-b573-01a7ea243deb  
+
+3. Poner las IP y verificar la conexión.
+
+
+# ROUTER
+
+	ip a
+
+	ip link set enp0s8 up
+
+	ip link set enp0s9 up
+
+	ip address add 192.168.2.1/24 dev enp0s8
+
+	ip address add 192.168.3.1/24 dev enp0s9
+
+# HOST A1
+
+	ip a
+
+	ip link set enp0s3 up
+
+	ip address add 192.168.2.2/24 dev enp0s3
+
+	ip r
+
+	ip route add default via 192.168.2.1
+
+	PROBAMOS EL PING ping 192.168.2.1
+
+	
+
+# HOST A2
+
+4. Realizar el NAT de NetA y NetB.
+
+ root  /  home  keshi  cat nat.sh 
+#! /bin/bash
+# @edt ASIX M11-SAD Curs 2018-2019
+# iptables
+
+#echo 1 > /proc/sys/ipv4/ip_forward
+
+# Regles flush
+iptables -F
+iptables -X
+iptables -Z
+iptables -t nat -F
+
+# Polítiques per defecte:
+iptables -P INPUT ACCEPT
+iptables -P OUTPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -t nat -P PREROUTING ACCEPT
+iptables -t nat -P POSTROUTING ACCEPT
+
+# obrir el localhost
+iptables -A INPUT  -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+# obrir la nostra ip
+iptables -A INPUT -s 192.168.0.26 -j ACCEPT
+iptables -A OUTPUT -d 192.168.0.26 -j ACCEPT
+
+# Fer NAT per les xarxes internes:
+# - 192.168.2.0.0/24 NET A
+# - 192.168.3.0.0/24 NET B
+
+iptables -t nat -A POSTROUTING -s 192.168.2.0/24 -o enp0s3 -j MASQUERADE
+iptables -t nat -A POSTROUTING -s 192.168.3.0/24 -o enp0s3 -j MASQUERADE
+
+
+5. Verificar la conexión a INTERNET y DNS al exterior.
+
+PING 
+
+TRACERT
+
+NSLOOKUP
+
+DIG
+
+HOST
+
+6. Verificar con PING a todas las interficies.
+
+PING
+
+
+### OPENVPN
+
+1. Abrir una máquina Debian en AWS - Lanzar una Instancia permitiendo el puerto UDP 1194.
+
+2. Instalar openVPN en AWS y en los 2 hosts: apt-get install openvpn
+
+# AWS
+
+apt-get update 
+
+apt-get install openvpn
+
+apt-get install mlocate
+
+updatedb
+
+locate openvpn@.service
+
+cd /etc/systemd/system
+
+Crear fichero de SERVICIO openvpn@.service y repetirlo en AWS y en los 2 CLIENTES de distintas redes.
+
+# nano /etc/systemd/system/openvpn@.service
+
+```                                   
+[Unit]
+Description=OpenVPN Robust And Highly Flexible Tunneling Application On %I
+After=network.target
+
+[Service]
+PrivateTmp=true
+Type=forking
+PIDFile=/var/run/openvpn/%i.pid
+ExecStart=/usr/sbin/openvpn --daemon --writepid /var/run/openvpn/%i.pid --cd /etc/openvpn/ --config %i.conf
+
+[Install]
+WantedBy=multi-user.target
+
+
+```
+
+# systemctl daemon-reload
+
+NOTA: REPETIR EL MISMO PROCESO PARA LOS 2 CLIENTES - COPIARLO IGUAL
+
+apt-get install tree
+
+
+
+---
+
+3. Generar CERTIFICADOS para SERVER OpenVPN y CLIENTES OpenVPN:
+
+	GENERAR CLAVE DE CA
+
+  148  openssl genrsa -out cakey.pem 1024
+
+	GENERAR CERTIFICADO DE LA CA
+
+  149  openssl req -new -x509 -nodes -sha1 -days 365 -key cakey.pem -out cacert.pem
+
+
+	GENERAR LA CLAVE DEL SERVIDOR SERVERKEY.
+
+	openssl genrsa -out serverkey.vpn.pem
+
+
+	CON LA CLAVE PRIVADA, FIRMAMOS LA REQUEST Y GENERAMOS EL FICHERO 'SERVERREQ.VPN.PEM'
+
+	openssl req -new -key serverkey.vpn.pem -out serverreq.vpn.pem
+
+
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:CA
+State or Province Name (full name) [Some-State]:Barcelona
+Locality Name (eg, city) []:bcn
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:edt
+Organizational Unit Name (eg, section) []:vpn
+Common Name (e.g. server FQDN or YOUR name) []:vpn.edt.org
+Email Address []:vpn@edt.org
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:jupiter
+An optional company name []:vpn
+
+
+
+
+	COMO CA, COGEMOS ESTE REQUEST GENERADO ANTERIORMMENTE Y LO FIRMAREMOS, EL FICHEROCON EXTENSIONES DE SERVIDOR.
+
+	Crear el fichero ext.server.conf
+
+```
+[ server ]
+
+basicConstraints       = CA:FALSE
+nsCertType             = server
+nsComment              = "OpenSSL Generated Server Certificate"
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid,issuer:always
+extendedKeyUsage       = serverAuth
+keyUsage               = digitalSignature, keyEncipherment
+
+```
+
+	Firmar la REQ y Generar la CERT para VPN
+
+
+
+  151  openssl x509 -CAkey cakey.pem -CA cacert.pem -req -in serverreq.vpn.pem -days 3650 -CAcreateserial -extfile ext.server.conf -out servercert.vpn.pem
+
+
+Signature ok
+subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = vpn, CN = vpn.edt.org, emailAddress = vpn@edt.org
+Getting CA Private Key
+
+
+	GENERAR CLAVE DHPARAM 
+
+  152  openssl dhparam -out dh2048.pem 2048
+
+
+Copiar y pegar la configuración del HowTo
+
+
+	COPIAR TODA LA CONFIGURACIÓN A AWS CON SCP O TE LO SUBES EN GIT Y HACES UN GIT CLONE O SIMPLEMENTE GENERANDOLO TODO DESDE EL SERVIDOR
+
+	scp openvpn/. -i KeshiPortable.pem admin@IP_AMAZON:/home/admin/.
+
+
+	DESPUÉS DE COPIARLO TODO SE MUEVE A /ETC/OPENVPN/SERVER
+
+	cp ./server/. /etc/openvpn/server/.
+
+	CREAMOS DENTRO DE /ETC/OPENVPN/SERVER/. --> server.conf
+
+	nano server.conf
+
+	AÑADIMOS LO SIGUIENTE [CAMBIAMOS CA / CERT / KEY / DH Y TA]
+
+ca /etc/openvpn/server/cacert.pem
+cert /etc/openvpn/server/servercert.vpn.pem
+key /etc/openvpn/server/serverkey.vpn.pem
+dh /etc/openvpn/server/dh2048.pem
+
+HAY QUE GENERAR EL TA.KEY DENTRO DE /ETC/OPENVPN/SERVER [importante hacerla!!!! y especificarla dentro del fichero]
+
+SUDO OPENVPN --GENKEY --SECRET TA.KEY
+
+tls-auth /etc/openvpn/server/ta.key 0
+
+
+HAY QUE GENERAR EL TA.KEY DENTRO DE /ETC/OPENVPN/SERVER [importante hacerla!!!! y especificarla dentro del fichero]
+
+```
+#################################################
+# Sample OpenVPN 2.0 config file for            #
+# multi-client server.                          #
+#                                               #
+# This file is for the server side              #
+# of a many-clients <-> one-server              #
+# OpenVPN configuration.                        #
+#                                               #
+# OpenVPN also supports                         #
+# single-machine <-> single-machine             #
+# configurations (See the Examples page         #
+# on the web site for more info).               #
+#                                               #
+# This config should work on Windows            #
+# or Linux/BSD systems.  Remember on            #
+# Windows to quote pathnames and use            #
+# double backslashes, e.g.:                     #
+# "C:\\Program Files\\OpenVPN\\config\\foo.key" #
+#                                               #
+# Comments are preceded with '#' or ';'         #
+#################################################
+
+# Which local IP address should OpenVPN
+# listen on? (optional)
+;local a.b.c.d
+
+# Which TCP/UDP port should OpenVPN listen on?
+# If you want to run multiple OpenVPN instances
+# on the same machine, use a different port
+# number for each one.  You will need to
+# open up this port on your firewall.
+port 1194
+
+# TCP or UDP server?
+;proto tcp
+proto udp
+
+# "dev tun" will create a routed IP tunnel,
+# "dev tap" will create an ethernet tunnel.
+# Use "dev tap0" if you are ethernet bridging
+# and have precreated a tap0 virtual interface
+# and bridged it with your ethernet interface.
+# If you want to control access policies
+# over the VPN, you must create firewall
+# rules for the the TUN/TAP interface.
+# On non-Windows systems, you can give
+# an explicit unit number, such as tun0.
+# On Windows, use "dev-node" for this.
+# On most systems, the VPN will not function
+# unless you partially or fully disable
+# the firewall for the TUN/TAP interface.
+;dev tap
+dev tun
+
+# Windows needs the TAP-Win32 adapter name
+# from the Network Connections panel if you
+# have more than one.  On XP SP2 or higher,
+# you may need to selectively disable the
+# Windows firewall for the TAP adapter.
+# Non-Windows systems usually don't need this.
+;dev-node MyTap
+
+# SSL/TLS root certificate (ca), certificate
+# (cert), and private key (key).  Each client
+# and the server must have their own cert and
+# key file.  The server and all clients will
+# use the same ca file.
+#
+# See the "easy-rsa" directory for a series
+# of scripts for generating RSA certificates
+# and private keys.  Remember to use
+# a unique Common Name for the server
+# and each of the client certificates.
+#
+# Any X509 key management system can be used.
+# OpenVPN can also use a PKCS #12 formatted key file
+# (see "pkcs12" directive in man page).
+#ca ca.crt
+#cert server.crt
+#key server.key  # This file should be kept secret
+
+# Diffie hellman parameters.
+# Generate your own with:
+#   openssl dhparam -out dh2048.pem 2048
+#dh dh2048.pem
+
+ca /etc/openvpn/server/ca_andal_cert.pem
+cert /etc/openvpn/server/servercert.vpn.pem
+key /etc/openvpn/server/serverkey.vpn.pem
+dh /etc/openvpn/server/dh2048.pem
+
+# Network topology
+# Should be subnet (addressing via IP)
+# unless Windows clients v2.0.9 and lower have to
+# be supported (then net30, i.e. a /30 per client)
+# Defaults to net30 (not recommended)
+;topology subnet
+
+# Configure server mode and supply a VPN subnet
+# for OpenVPN to draw client addresses from.
+# The server will take 10.8.0.1 for itself,
+# the rest will be made available to clients.
+# Each client will be able to reach the server
+# on 10.8.0.1. Comment this line out if you are
+# ethernet bridging. See the man page for more info.
+server 10.8.0.0 255.255.255.0
+
+# Maintain a record of client <-> virtual IP address
+# associations in this file.  If OpenVPN goes down or
+# is restarted, reconnecting clients can be assigned
+# the same virtual IP address from the pool that was
+# previously assigned.
+ifconfig-pool-persist ipp.txt
+
+# Configure server mode for ethernet bridging.
+# You must first use your OS's bridging capability
+# to bridge the TAP interface with the ethernet
+# NIC interface.  Then you must manually set the
+# IP/netmask on the bridge interface, here we
+# assume 10.8.0.4/255.255.255.0.  Finally we
+# must set aside an IP range in this subnet
+# (start=10.8.0.50 end=10.8.0.100) to allocate
+# to connecting clients.  Leave this line commented
+# out unless you are ethernet bridging.
+;server-bridge 10.8.0.4 255.255.255.0 10.8.0.50 10.8.0.100
+
+# Configure server mode for ethernet bridging
+# using a DHCP-proxy, where clients talk
+# to the OpenVPN server-side DHCP server
+# to receive their IP address allocation
+# and DNS server addresses.  You must first use
+# your OS's bridging capability to bridge the TAP
+# interface with the ethernet NIC interface.
+# Note: this mode only works on clients (such as
+# Windows), where the client-side TAP adapter is
+# bound to a DHCP client.
+;server-bridge
+
+# Push routes to the client to allow it
+# to reach other private subnets behind
+# the server.  Remember that these
+# private subnets will also need
+# to know to route the OpenVPN client
+# address pool (10.8.0.0/255.255.255.0)
+# back to the OpenVPN server.
+;push "route 192.168.10.0 255.255.255.0"
+;push "route 192.168.20.0 255.255.255.0"
+
+# To assign specific IP addresses to specific
+# clients or if a connecting client has a private
+# subnet behind it that should also have VPN access,
+# use the subdirectory "ccd" for client-specific
+# configuration files (see man page for more info).
+
+# EXAMPLE: Suppose the client
+# having the certificate common name "Thelonious"
+# also has a small subnet behind his connecting
+# machine, such as 192.168.40.128/255.255.255.248.
+# First, uncomment out these lines:
+;client-config-dir ccd
+;route 192.168.40.128 255.255.255.248
+# Then create a file ccd/Thelonious with this line:
+#   iroute 192.168.40.128 255.255.255.248
+# This will allow Thelonious' private subnet to
+# access the VPN.  This example will only work
+# if you are routing, not bridging, i.e. you are
+# using "dev tun" and "server" directives.
+
+# EXAMPLE: Suppose you want to give
+# Thelonious a fixed VPN IP address of 10.9.0.1.
+# First uncomment out these lines:
+;client-config-dir ccd
+;route 10.9.0.0 255.255.255.252
+# Then add this line to ccd/Thelonious:
+#   ifconfig-push 10.9.0.1 10.9.0.2
+
+# Suppose that you want to enable different
+# firewall access policies for different groups
+# of clients.  There are two methods:
+# (1) Run multiple OpenVPN daemons, one for each
+#     group, and firewall the TUN/TAP interface
+#     for each group/daemon appropriately.
+# (2) (Advanced) Create a script to dynamically
+#     modify the firewall in response to access
+#     from different clients.  See man
+#     page for more info on learn-address script.
+;learn-address ./script
+
+# If enabled, this directive will configure
+# all clients to redirect their default
+# network gateway through the VPN, causing
+# all IP traffic such as web browsing and
+# and DNS lookups to go through the VPN
+# (The OpenVPN server machine may need to NAT
+# or bridge the TUN/TAP interface to the internet
+# in order for this to work properly).
+;push "redirect-gateway def1 bypass-dhcp"
+
+# Certain Windows-specific network settings
+# can be pushed to clients, such as DNS
+# or WINS server addresses.  CAVEAT:
+# http://openvpn.net/faq.html#dhcpcaveats
+# The addresses below refer to the public
+# DNS servers provided by opendns.com.
+;push "dhcp-option DNS 208.67.222.222"
+;push "dhcp-option DNS 208.67.220.220"
+
+# Uncomment this directive to allow different
+# clients to be able to "see" each other.
+# By default, clients will only see the server.
+# To force clients to only see the server, you
+# will also need to appropriately firewall the
+# server's TUN/TAP interface.
+client-to-client
+
+# Uncomment this directive if multiple clients
+# might connect with the same certificate/key
+# files or common names.  This is recommended
+# only for testing purposes.  For production use,
+# each client should have its own certificate/key
+# pair.
+#
+# IF YOU HAVE NOT GENERATED INDIVIDUAL
+# CERTIFICATE/KEY PAIRS FOR EACH CLIENT,
+# EACH HAVING ITS OWN UNIQUE "COMMON NAME",
+# UNCOMMENT THIS LINE OUT.
+;duplicate-cn
+
+# The keepalive directive causes ping-like
+# messages to be sent back and forth over
+# the link so that each side knows when
+# the other side has gone down.
+# Ping every 10 seconds, assume that remote
+# peer is down if no ping received during
+# a 120 second time period.
+keepalive 10 120
+
+# For extra security beyond that provided
+# by SSL/TLS, create an "HMAC firewall"
+# to help block DoS attacks and UDP port flooding.
+#
+# Generate with:
+#   openvpn --genkey --secret ta.key
+#
+# The server and each client must have
+# a copy of this key.
+# The second parameter should be '0'
+# on the server and '1' on the clients.
+#tls-auth ta.key 0 # This file is secret
+tls-auth /etc/openvpn/server/ta.key 0
+
+# Select a cryptographic cipher.
+# This config item must be copied to
+# the client config file as well.
+# Note that v2.4 client/server will automatically
+# negotiate AES-256-GCM in TLS mode.
+# See also the ncp-cipher option in the manpage
+cipher AES-256-CBC
+
+# Enable compression on the VPN link and push the
+# option to the client (v2.4+ only, for earlier
+# versions see below)
+;compress lz4-v2
+;push "compress lz4-v2"
+
+# For compression compatible with older clients use comp-lzo
+# If you enable it here, you must also
+# enable it in the client config file.
+;comp-lzo
+
+# The maximum number of concurrently connected
+# clients we want to allow.
+;max-clients 100
+
+# It's a good idea to reduce the OpenVPN
+# daemon's privileges after initialization.
+#
+# You can uncomment this out on
+# non-Windows systems.
+;user nobody
+;group nobody
+
+# The persist options will try to avoid
+# accessing certain resources on restart
+# that may no longer be accessible because
+# of the privilege downgrade.
+persist-key
+persist-tun
+
+# Output a short status file showing
+# current connections, truncated
+# and rewritten every minute.
+status openvpn-status.log
+
+# By default, log messages will go to the syslog (or
+# on Windows, if running as a service, they will go to
+# the "\Program Files\OpenVPN\log" directory).
+# Use log or log-append to override this default.
+# "log" will truncate the log file on OpenVPN startup,
+# while "log-append" will append to it.  Use one
+# or the other (but not both).
+;log         openvpn.log
+;log-append  openvpn.log
+
+# Set the appropriate level of log
+# file verbosity.
+#
+# 0 is silent, except for fatal errors
+# 4 is reasonable for general usage
+# 5 and 6 can help to debug connection problems
+# 9 is extremely verbose
+verb 3
+
+# Silence repeating messages.  At most 20
+# sequential messages of the same message
+# category will be output to the log.
+;mute 20
+
+# Notify the client that when the server restarts so it
+# can automatically reconnect.
+explicit-exit-notify 
+
+```	
+
+IMPORTANTE: server.conf DEBE IR A /ETC/OPENVPN sino dará ERROR!!!! al ejecutar SYSTEMCTL STOP OPENVPN@SERVER.SERVICE
+
+SYSTEMCTL START OPENVPN@SERVER.SERVICE
+
+	HACEMOS IP A y vemos que nos ha creado el TUN0.
+
+1 conf para cliente y otra para el servidor y las otras 2 para el cliente.
+
+
+
+PS -AX | GREP OPENVPN para ver que está OK openVPN
+
+root@ip-172-31-91-93:/etc/openvpn# ps -ax | grep openvpn
+ 8281 ?        Ss     0:00 /usr/sbin/openvpn --daemon --writepid /var/run/openvpn/server.pid --cd /etc/openvpn/ --config server.conf
+ 8361 pts/1    S+     0:00 grep openvpn
+
+
+COMANDOS DE AYUDA:
+
+JOURNALCTL -XE
+
+SYSTEMCTL STATUS OPENVPN@SERVER.SERVICE
+
+SYSTEMCTL DAEMON-RELOAD (SI HEMOS CAMBIADO ALGO EN EL FICHERO /ETC/SYSTEMD/SYSTEM/OPENVPN@.SERVICE)
+
+TIENE QUE TENER LA MISMA CONFIGURACIÓN EN TODAS! SOLO CAMBIA LA CONFIGURACIÓN CLIENTE.
+
+
+
+---------------------------
+
+# CLIENTE 1
+
+IMPORTANTE COPIAR LOS FICHEROS CAKEY.PEM Y CA_ANDAL_CERT.PEM a los clientes1 (a1) y clientes2 (b1)
+
+scp ca_andal_cert.pem cakey.pem debian@192.168.3.2:/home/debian/.
+
+scp ca_andal_cert.pem cakey.pem debian@192.168.2.2:/home/debian/.
+
+
+1. GENERAMOS EL KEY PRIVADA PARA EL CLIENTE1
+
+debian@debian10:~$ openssl genrsa -out clientkey.1vpn.pem
+Generating RSA private key, 2048 bit long modulus (2 primes)
+...+++++
+........+++++
+e is 65537 (0x010001)
+debian@debian10:~$ 
+
+2. CON LA CLAVE PRIVADA, GENERAMOS UN REQUEST PARA QUE SEA FIRMADO POSTERIORMENTE POR LA CA
+
+debian@debian10:~$ openssl req -new -key clientkey.1vpn.pem -out clientreq.1vpn.pem
+
+
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:CA
+State or Province Name (full name) [Some-State]:Barcelona
+Locality Name (eg, city) []:bcn
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:edt
+Organizational Unit Name (eg, section) []:client1
+Common Name (e.g. server FQDN or YOUR name) []:client1.edt.org
+Email Address []:client1@edt.org
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:jupiter
+An optional company name []:client1
+debian@debian10:~$ 
+
+
+3. Cogeremos el REQUEST generado previamente y lo firmaremos utilizando el fichero de extensiones "ext.client.conf"
+
+	ACTUAMOS COMO CA
+
+	GENERAR EL FICHERO ext.client.conf
+
+```
+basicConstraints        = CA:FALSE
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid,issuer:always
+
+```
+
+	GENERAMOS EL CERTIFICADO FIRMADO POR LA CA Y USANDO LAS EXTENSIONES "ext.client.conf"
+
+openssl x509 -CAkey cakey.pem -CA cacert.pem -req -in clientreq.1vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.1vpn.pem
+
+Signature ok
+subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = client1, CN = client1.edt.org, emailAddress = client1@edt.org
+Getting CA Private Key
+debian@debian10:~$ 
+
+
+COPIAMOS TODO A /ETC/OPENVPN/CLIENT/.
+
+   74  cp ca_andal_cert.pem clientcert.1vpn.pem clientkey.1vpn.pem /etc/openvpn/client/.
+
+CREAMOS client.conf dentro de /ETC/OPENVPN/.
+
+ 76  nano client.conf
+
+
+MODIFICAMOS:
+
+IP AMAZON
+
+remote 35.174.173.6 1194
+
+CERTIFICADOS Y CLAVES
+
+ca /etc/openvpn/client/ca_andal_cert.pem
+cert /etc/openvpn/client/clientcert.1vpn.pem
+key /etc/openvpn/client/clientkey.1vpn.pem
+
+TA.KEY
+
+tls-auth /etc/openvpn/client/ta.key 1
+
+
+HAY QUE USAR EL MISMO TA.KEY ANTERIOR!! GENERADO POR EL SERVIDOR!
+
+
+HAY QUE GENERAR EL TA.KEY DENTRO DE /ETC/OPENVPN/CLIENT [importante hacerla!!!! y especificarla dentro del fichero]
+
+
+SUDO OPENVPN --GENKEY --SECRET TA.KEY
+
+HAY QUE GENERAR EL TA.KEY DENTRO DE /ETC/OPENVPN/CLIENT [importante hacerla!!!! y especificarla dentro del fichero]
+
+```
+##############################################
+# Sample client-side OpenVPN 2.0 config file #
+# for connecting to multi-client server.     #
+#                                            #
+# This configuration can be used by multiple #
+# clients, however each client should have   #
+# its own cert and key files.                #
+#                                            #
+# On Windows, you might want to rename this  #
+# file so it has a .ovpn extension           #
+##############################################
+
+# Specify that we are a client and that we
+# will be pulling certain config file directives
+# from the server.
+client
+
+# Use the same setting as you are using on
+# the server.
+# On most systems, the VPN will not function
+# unless you partially or fully disable
+# the firewall for the TUN/TAP interface.
+;dev tap
+dev tun
+
+# Windows needs the TAP-Win32 adapter name
+# from the Network Connections panel
+# if you have more than one.  On XP SP2,
+# you may need to disable the firewall
+# for the TAP adapter.
+;dev-node MyTap
+
+# Are we connecting to a TCP or
+# UDP server?  Use the same setting as
+# on the server.
+;proto tcp
+proto udp
+
+# The hostname/IP and port of the server.
+# You can have multiple remote entries
+# to load balance between the servers.
+#remote  1194
+#;remote servervpn 1194
+# vpn.edt.org 1194 ?? i a /etc/hosts vpn.edt.org  IP:AMAZON ??
+remote 35.174.173.66 1194
+
+# Choose a random host from the remote
+# list for load-balancing.  Otherwise
+# try hosts in the order specified.
+;remote-random
+
+# Keep trying indefinitely to resolve the
+# host name of the OpenVPN server.  Very useful
+# on machines which are not permanently connected
+# to the internet such as laptops.
+resolv-retry infinite
+
+# Most clients don't need to bind to
+# a specific local port number.
+nobind
+
+# Downgrade privileges after initialization (non-Windows only)
+;user nobody
+;group nobody
+
+# Try to preserve some state across restarts.
+persist-key
+persist-tun
+
+# If you are connecting through an
+# HTTP proxy to reach the actual OpenVPN
+# server, put the proxy server/IP and
+# port number here.  See the man page
+# if your proxy server requires
+# authentication.
+;http-proxy-retry # retry on connection failures
+;http-proxy [proxy server] [proxy port #]
+
+# Wireless networks often produce a lot
+# of duplicate packets.  Set this flag
+# to silence duplicate packet warnings.
+;mute-replay-warnings
+
+# SSL/TLS parms.
+# See the server config file for more
+# description.  It's best to use
+# a separate .crt/.key file pair
+# for each client.  A single ca
+# file can be used for all clients.
+#
+# # HEM DE CAMBIAR 
+ca /etc/openvpn/client/ca_andal_cert.pem
+cert /etc/openvpn/client/clientcert.1vpn.pem
+key /etc/openvpn/client/clientkey.1vpn.pem
+
+# Verify server certificate by checking that the
+# certicate has the correct key usage set.
+# This is an important precaution to protect against
+# a potential attack discussed here:
+#  http://openvpn.net/howto.html#mitm
+#
+# To use this feature, you will need to generate
+# your server certificates with the keyUsage set to
+#   digitalSignature, keyEncipherment
+# and the extendedKeyUsage to
+#   serverAuth
+# EasyRSA can do this for you.
+remote-cert-tls server
+
+# If a tls-auth key is used on the server
+# then every client must also have the key.
+tls-auth /etc/openvpn/client/ta.key 1
+
+# Select a cryptographic cipher.
+# If the cipher option is used on the server
+# then you must also specify it here.
+# Note that v2.4 client/server will automatically
+# negotiate AES-256-GCM in TLS mode.
+# See also the ncp-cipher option in the manpage
+cipher AES-256-CBC
+
+# Enable compression on the VPN link.
+# Don't enable this unless it is also
+# enabled in the server config file.
+#comp-lzo
+
+# Set log file verbosity.
+verb 3
+
+# Silence repe
+;mute 20
+
+```
+
+
+
+
+
+IMPORTANTE: client.conf DEBE IR A /ETC/OPENVPN sino dará ERROR!!!! al ejecutar SYSTEMCTL STOP OPENVPN@CLIENT.SERVICE
+
+SYSTEMCTL START OPENVPN@CLIENT.SERVICE
+
+	HACEMOS IP A y vemos que nos ha creado el TUN0.
+
+
+VERIFICAR CON ps -ax | grep openvpn
+
+NOTA: SI TE DA ERRORES, verifica cada uno de los FICHEROS.
+
+VERIFICA SI ESTÁ BIEN PUESTO /etc/systemd/system/openvpn@.service
+
+VERIFICAMOS CON IP A
+
+PS -AX | GREP OPENVPN para ver que está OK openVPN
+
+root@debian10:/etc/openvpn/client# ps -ax | grep openvpn
+ 1722 ?        Ss     0:00 /usr/sbin/openvpn --daemon --writepid /var/run/openvpn/client.pid --cd /etc/openvpn/ --config client.conf
+ 1732 pts/0    S+     0:00 grep openvpn
+
+
+
+
+# CLIENTE 2
+
+REPETIR EL MISMO PROCESO QUE EL PRIMERO!!!!!!!!!!
+
+
+------------
+
+RESUMEN:
+
+1. GENERAR LA ESTRUCTURA DE RED VIA VIRTUALBOX CON NAT INCLUIDO PARA QUE PUEDAN SALIR AL EXTERIOR Y HACER PING ()
+
+2. ESTABLECER LAS IPS MANUALMENTE Y VERIFICAR LA CONEXIÓN.
+
+3. INSTALAR OPENVPN EN LAS 3 MÁQUINAS (SERVIDOR - CLIENTE1 - CLIENTE2).
+
+4. MODIFICAR EL DAEMON DEL SERVIDOR, CLIENTE1 Y CLIENTE2:
+
+```
+[Unit]
+Description=OpenVPN Robust And Highly Flexible Tunneling Application On %I
+After=network.target
+
+[Service]
+PrivateTmp=true
+Type=forking
+PIDFile=/var/run/openvpn/%i.pid
+ExecStart=/usr/sbin/openvpn --daemon --writepid /var/run/openvpn/%i.pid --cd /etc/openvpn/ --config %i.conf
+
+[Install]
+WantedBy=multi-user.target
+```
+
+5. HACER UN DAEMON-RELOAD PARA CARGAR LOS CAMBIOS.
+
+6. GENERAR CLAVES Y CERTIFICADO DE LA "CA".
+
+7. GENERAR EXTENSIONES PARA SERVIDOR "ext.server.conf"
+
+````
+[ server ]
+
+basicConstraints       = CA:FALSE
+nsCertType             = server
+nsComment              = "OpenSSL Generated Server Certificate"
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid,issuer:always
+extendedKeyUsage       = serverAuth
+keyUsage               = digitalSignature, keyEncipherment
+````
+
+8. Firmar la REQUEST con la clave PRIV de la CA y crear una CERT para VPN
+
+9. GENERAR UNA CLAVE DHPARAM DILLIE HEILLMAN.
+
+10. COPIAR TODA LA CONFIGURACIÓN A AWS CON SCP O TE LO SUBES EN GIT Y HACES UN GIT CLONE O SIMPLEMENTE GENERANDOLO TODO DESDE EL SERVIDOR
+
+11. DESPUÉS DE COPIARLO TODO SE MUEVE A /ETC/OPENVPN/SERVER
+
+12. CREAMOS DENTRO DE /ETC/OPENVPN/. --> server.conf Y GENERAMOS SU CONTENIDO DE SERVER OPENVPN [OJO VERIFICAR BIEN!]
+
+````
+ca /etc/openvpn/server/ca_andal_cert.pem
+cert /etc/openvpn/server/servercert.vpn.pem
+key /etc/openvpn/server/serverkey.vpn.pem
+dh /etc/openvpn/server/dh2048.pem
+```
+13. HAY QUE GENERAR EL TA.KEY DENTRO DE /ETC/OPENVPN/SERVER [importante hacerla!!!! y especificarla dentro del fichero]
+
+SUDO OPENVPN --GENKEY --SECRET TA.KEY
+
+tls-auth /etc/openvpn/server/ta.key 0
+
+14. IMPORTANTE: server.conf DEBE IR A /ETC/OPENVPN sino dará ERROR!!!! al ejecutar SYSTEMCTL STOP OPENVPN@SERVER.SERVICE
+
+15. PARAMOS EL SERVICIO Y LO VOLVEMOS A ENCENDER
+
+SYSTEMCTL STOP OPENVPN@SERVER.SERVICE
+
+SYSTEMCTL START OPENVPN@SERVER.SERVICE
+
+16. VERIFICAMOS QUE OPENVPN ESTÁ EN MARCHA
+
+PS -AX | GREP OPENVPN para ver que está OK openVPN
+
+root@ip-172-31-91-93:/etc/openvpn# ps -ax | grep openvpn
+ 8281 ?        Ss     0:00 /usr/sbin/openvpn --daemon --writepid /var/run/openvpn/server.pid --cd /etc/openvpn/ --config server.conf
+ 8361 pts/1    S+     0:00 grep openvpn
+
+
+
+17. PASAMOS LOS FICHEROS DEL SERVIDOR CAKEY.PEM Y CA_ANDAL_CERT.PEM A LOS CLIENTES A1 Y B1.
+
+scp ca_andal_cert.pem cakey.pem debian@192.168.3.2:/home/debian/.
+
+scp ca_andal_cert.pem cakey.pem debian@192.168.2.2:/home/debian/.
+
+18. GENERAMOS LA KEY PRIVADA PARA EL CLIENTE1.
+
+openssl genrsa -out clientkey.1vpn.pem
+
+19. CON LA CLAVE PRIVADA, GENERAMOS UN REQUEST PARA QUE SEA FIRMADO POSTERIORMENTE POR LA CA
+
+openssl req -new -key clientkey.1vpn.pem -out clientreq.1vpn.pem
+
+20. Cogeremos el REQUEST generado previamente y lo firmaremos utilizando el fichero de extensiones "ext.client.conf"
+
+	ACTUAMOS COMO CA - GENERAMOS EL FICHERO "ext.client.conf" dentro de /etc/openvpn/client/.
+
+	COPIAMOS ESTO
+
+````
+basicConstraints        = CA:FALSE
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid,issuer:always
+````
+
+21. GENERAMOS EL CERTIFICADO FIRMADO POR LA CA Y USANDO LAS EXTENSIONES "ext.client.conf"
+
+openssl x509 -CAkey cakey.pem -CA ca_andal_cert.pem -req -in clientreq.1vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.1vpn.pem
+
+Signature ok
+subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = client1, CN = client1.edt.org, emailAddress = client1@edt.org
+Getting CA Private Key
+debian@debian10:~$ 
+
+22. COPIAMOS TODO A /ETC/OPENVPN/CLIENT/.
+
+23. CREAMOS client.conf dentro de /ETC/OPENVPN/. --> NANO CLIENT.CONF
+
+	MODIFICAMOS:
+
+	IP AMAZON
+
+remote 35.174.173.6 1194
+
+	CERTIFICADOS Y CLAVES
+
+ca /etc/openvpn/client/ca_andal_cert.pem
+cert /etc/openvpn/client/clientcert.1vpn.pem
+key /etc/openvpn/client/clientkey.1vpn.pem
+
+	TA.KEY
+
+tls-auth /etc/openvpn/client/ta.key 1
+
+HAY QUE GENERAR EL TA.KEY DENTRO DE /ETC/OPENVPN/CLIENT [importante hacerla!!!! y especificarla dentro del fichero]
+
+
+SUDO OPENVPN --GENKEY --SECRET TA.KEY
+
+HAY QUE GENERAR EL TA.KEY DENTRO DE /ETC/OPENVPN/CLIENT [importante hacerla!!!! y especificarla dentro del fichero]
+
+
+
+24. IMPORTANTE: client.conf DEBE IR A /ETC/OPENVPN sino dará ERROR!!!! al ejecutar SYSTEMCTL STOP OPENVPN@SERVER.SERVICE
+
+
+25. PARAMOS EL SERVICIO Y LO VOLVEMOS A ENCENDER
+
+SYSTEMCTL STOP OPENVPN@CLIENT.SERVICE
+
+SYSTEMCTL START OPENVPN@CLIENT.SERVICE
+
+26. VERIFICAMOS QUE OPENVPN ESTÁ EN MARCHA
+
+PS -AX | GREP OPENVPN para ver que está OK openVPN
+
+root@debian10:/etc/openvpn/client# ps -ax | grep openvpn
+ 1722 ?        Ss     0:00 /usr/sbin/openvpn --daemon --writepid /var/run/openvpn/client.pid --cd /etc/openvpn/ --config client.conf
+ 1732 pts/0    S+     0:00 grep openvpn
+
+
+
+NOTA: SI TE DA ERRORES, verifica cada uno de los FICHEROS.
+
+VERIFICA SI ESTÁ BIEN PUESTO /etc/systemd/system/openvpn@.service
+
+------------
+
+27. # CLIENTE 2
+
+REPETIR EL MISMO PROCESO QUE EL PRIMERO!!!!!!!!!!
+
+
+SPEEDRUN
+   95  openssl genrsa -out clientkey.2vpn.pem
+   96  openssl req -new -key clientkey.2vpn.pem -out clienreq.2vpn.pem
+   97  nano ext.client.conf
+   98  openssl x509 -CAkey cakey.pem -CA ca_andal_cert.pem -req -in clientreq.2vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.2vpn.pem
+   99  sudo openssl x509 -CAkey cakey.pem -CA ca_andal_cert.pem -req -in clientreq.2vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.2vpn.pem
+  100  sudo bash
+  101  ls -l
+  102  mv clienreq.2vpn.pem clientreq.2vpn.pem
+  103  openssl x509 -CAkey cakey.pem -CA ca_andal_cert.pem -req -in clientreq.2vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.2vpn.pem
+  104  sudo cp ca_andal_cert.pem clientcert.2vpn.pem clientkey.2vpn.pem /etc/openvpn/client/.
+  105  cd /etc/openvpn/
+  106  sudo bash
+   86  openvpn --genkey --secret ta.key
+   87  systemctl stop openvpn@client.service
+   88  systemctl start openvpn@client.service
+   89  cd /etc/systemd/system
+   90  nano openvpn\@.service 
+   91  systemctl daemon-reload
+   92  systemctl stop openvpn@client.service
+   93  systemctl start openvpn@client.service
+   94  systemctl status openvpn@client.service
+   95  ip a
+
+
+
+----------------------------
+
+PROVES!!! CLIENT1
+
+
+
+* **Generem clau privada simple per el client:**
+```
+openssl  genrsa -out clientkey.1vpn.pem
+```
+
+**Amb la clau privada, signem el 'request' i generem el fitxer 'clientreq.vpn.pem':**
+```
+openssl req -new -key clientkey.1vpn.pem -out clientreq.1vpn.pem
+
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:CA
+State or Province Name (full name) [Some-State]:Barcelona
+Locality Name (eg, city) []:bcn
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:edt
+Organizational Unit Name (eg, section) []:client1
+Common Name (e.g. server FQDN or YOUR name) []:client1.edt.org
+Email Address []:client1@edt.org
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:jupiter
+An optional company name []:client1
+```
+
+**Com a CA, agafem el 'request' generat previament i signarem utilitzant el fitxer d'extensions de client:**
+```
+openssl x509 -CAkey ../cakey.pem -CA ../cacert.pem -req -in clientreq.1vpn.pem -days 3650 -CAcreateserial -extfile ../server/ext.client.conf -out clientcert.1vpn.pem
+Signature ok
+subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = client1, CN = client1.edt.org, emailAddress = client1@edt.org
+Getting CA Private Key
+```
+
+
+Ens copiem el fitxer de conf de client (a la ruta on toca) i certificats i clau --> /etc/openvpn/client
+
+A /etc/openvpn/client/client.conf
+
+s'ha de canviar canviar a manija:
+
+remote IP_AWS port (1143)
+
+
+---------------------------------------------
+
+**PROVES:**
+
+** TENINT EL PORT daytime (port 13) FUNCIONANT
+podem fer probes tipus: 
+
+	CLIENT 1 A CLIENT 2: 
+
+	telnet client2.edt.org 13 
+	(hauria de tornar el dia/hora)
