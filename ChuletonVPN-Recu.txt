@@ -1,0 +1,172 @@
+SERVER AMAZON AWS 1194 UDP OPEN PORT - ACCESS SSH
+
+# Generar KEY CA
+
+openssl genrsa -out cakey.pem
+
+# GENERAR CA NUEVO "aaron05" 
+
+openssl req -new -x509 -days 1000 -key cakey.pem -out ca_aaron05_cert.pem
+
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:CA
+State or Province Name (full name) [Some-State]:Barcelona
+Locality Name (eg, city) []:bcn
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:Veritat Aaron 05 Absoluta
+Organizational Unit Name (eg, section) []:certificats
+Common Name (e.g. server FQDN or YOUR name) []:veritat
+Email Address []:veritat@edt.org
+
+---------------------------------------------------
+
+# SERVER 
+
+--------------------------------------------------
+
+1. Copiar los CA nuevo en el SERVIDOR de AMAZON
+
+2. Generar certificados para VPN.
+
+openssl genrsa -out serverkey.vpn.pem
+
+openssl req -new -key serverkey.vpn.pem -out serverreq.vpn.pem
+
+
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:CA
+State or Province Name (full name) [Some-State]:Barcelona
+Locality Name (eg, city) []:bcn
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:edt
+Organizational Unit Name (eg, section) []:vpn
+Common Name (e.g. server FQDN or YOUR name) []:vpn.edt.org
+Email Address []:vpn@edt.org
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:jupiter
+An optional company name []:vpn
+
+# FIRMAMOS como CA y CREAMOS el CERTIFICADO PARA VPN
+
+openssl x509 -CAkey cakey.pem -CA ca_aaron05_cert.pem -req -in serverreq.vpn.pem -days 3650 -CAcreateserial -extfile ext.server.conf -out servercert.vpn.pem
+
+Signature ok
+subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = vpn, CN = vpn.edt.org, emailAddress = vpn@edt.org
+Getting CA Private Key
+
+
+# Creamos la clave DH
+
+openssl dhparam -out dh2048.pem 2048
+
+# Modificamos y ponemos server.conf
+
+ ca /etc/openvpn/server/ca_aaron05_cert.pem
+ cert /etc/openvpn/server/servercert.vpn.pem
+ key /etc/openvpn/server/serverkey.vpn.pem
+ dh /etc/openvpn/server/dh2048.pem
+
+
+tls-auth /etc/openvpn/server/ta.key 0
+
+
+# Generamos TA KEY
+
+sudo openvpn --genkey --secret ta.key
+
+# Hacemos un 
+
+sudo systemctl daemon-reload
+
+sudo systemctl stop openvpn@server.service
+
+sudo systemctl start openvpn@server.service
+
+
+
+----
+
+EXTRA
+
+
+----
+
+
+  158  sudo openvpn --genkey --secret ta.key
+
+  162  sudo systemctl stop openvpn@server.service
+  163  sudo systemctl start openvpn@server.service
+  164  ip a
+  188  sudo cp ca_aaron05_cert.pem ta.key cakey.pem $HOME
+  189  cd $HOME
+  200  sudo chown admin.admin ca_aaron05_cert.pem cakey.pem ta.key 
+  201  sudo chmod +r cakey.pem ta.key 
+
+
+-----
+
+CLIENT1
+
+1. PASAR LOS FICHEROS TA.KEY - CACERT.PEM - CA_AARON05_CERT.PEM A CLIENT1 Y CLIENT2 ALSO
+
+
+-----
+
+isx36579183@i11:~/Documents/tunels_vpn22/VPN-Aaron05$ openssl  genrsa -out clientkey.1vpn.pem
+Generating RSA private key, 2048 bit long modulus (2 primes)
+...........................+++++
+.............................................................+++++
+e is 65537 (0x010001)
+
+isx36579183@i11:~/Documents/tunels_vpn22/VPN-Aaron05$ openssl req -new -key clientkey.1vpn.pem -out clientreq.1vpn.pem
+
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:CA
+State or Province Name (full name) [Some-State]:Barcelona
+Locality Name (eg, city) []:bcn
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:edt
+Organizational Unit Name (eg, section) []:client1
+Common Name (e.g. server FQDN or YOUR name) []:client1.edt.org
+Email Address []:client1@edt.org
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:jupiter
+An optional company name []:client1
+
+
+---
+
+nano ext.client.conf
+
+basicConstraints        = CA:FALSE
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid,issuer:always
+
+
+---
+
+isx36579183@i11:~/Documents/tunels_vpn22/VPN-Aaron05$ openssl x509 -CAkey cakey.pem -CA ca_aaron05_cert.pem -req -in clientreq.1vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.1vpn.pem
+Signature ok
+subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = client1, CN = client1.edt.org, emailAddress = client1@edt.org
+Getting CA Private Key
+
+
