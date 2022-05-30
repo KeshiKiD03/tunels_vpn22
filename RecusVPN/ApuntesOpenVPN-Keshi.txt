@@ -244,8 +244,6 @@ An optional company name []:vpn
 	Crear el fichero ext.server.conf
 
 ```
-[ server ]
-
 basicConstraints       = CA:FALSE
 nsCertType             = server
 nsComment              = "OpenSSL Generated Server Certificate"
@@ -253,7 +251,6 @@ subjectKeyIdentifier   = hash
 authorityKeyIdentifier = keyid,issuer:always
 extendedKeyUsage       = serverAuth
 keyUsage               = digitalSignature, keyEncipherment
-
 ```
 
 	Firmar la REQ y Generar la CERT para VPN
@@ -967,8 +964,6 @@ WantedBy=multi-user.target
 7. GENERAR EXTENSIONES PARA SERVIDOR "ext.server.conf"
 
 ````
-[ server ]
-
 basicConstraints       = CA:FALSE
 nsCertType             = server
 nsComment              = "OpenSSL Generated Server Certificate"
