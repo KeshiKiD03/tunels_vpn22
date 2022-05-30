@@ -170,3 +170,61 @@ subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = client1, CN = client1.edt
 Getting CA Private Key
 
 
+# MODIFICAMOS EL CLIENT.CONF
+
+
+
+# Hacemos un 
+
+sudo systemctl daemon-reload
+
+sudo systemctl stop openvpn@server.service
+
+sudo systemctl start openvpn@server.service
+
+
+
+----
+
+CLIENT2
+
+isx36579183@j05:~/Documents/tunels_vpn22/VPN-Aaron05/Client2$ openssl genrsa -out clientkey.2vpn.pem
+Generating RSA private key, 2048 bit long modulus (2 primes)
+.......................................................+++++
+...........................................................................................................+++++
+e is 65537 (0x010001)
+isx36579183@j05:~/Documents/tunels_vpn22/VPN-Aaron05/Client2$ openssl req -new -key clientkey.2vpn.pem -out clientreq.2vpn.pem
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:CA
+State or Province Name (full name) [Some-State]:Barcelona
+Locality Name (eg, city) []:bcn
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:edt
+Organizational Unit Name (eg, section) []:client2
+Common Name (e.g. server FQDN or YOUR name) []:client2.edt.org
+Email Address []:client2@edt.org
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:jupiter
+An optional company name []:client2
+
+
+
+
+isx36579183@j05:~/Documents/tunels_vpn22/VPN-Aaron05/Client2$ openssl x509 -CAkey cakey.pem -CA ca_aaron05_cert.pem -req -in clientreq.2vpn.pem -days 3650 -CAcreateserial -extfile ext.client.conf -out clientcert.2vpn.pem
+Signature ok
+subject=C = CA, ST = Barcelona, L = bcn, O = edt, OU = client2, CN = client2.edt.org, emailAddress = client2@edt.org
+Getting CA Private Key
+isx36579183@j05:~/Documents/tunels_vpn22/VPN-Aaron05/Client2$ 
+
+
+
+sudo chmod 600 ta.key
+
+
